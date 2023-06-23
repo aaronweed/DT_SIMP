@@ -311,7 +311,7 @@ library(MASS)
   
   library(nlme)
   lmm1<-lme(R_Stems ~ lnStemst_1 + lnMecinust_1 + lnGRASSt_1 + lnBGROUNDt_1 
-            + pr_May + pr_May*lnGRASSt_1+ pr_May*lnMecinust_1 +
+            + pr_May + pr_May*lnMecinust_1 +
               pr_May*lnMecinust_1 , method="ML", random = ~1|SITE_NAME, data = stemdf, na.action= na.fail)
   VarCorr(lmm1)
   summary(lmm1)
