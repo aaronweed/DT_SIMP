@@ -189,15 +189,34 @@ df<-join(dt, sites, by=c("SITE_NAME"))
 #clean up df a little 
   stemdf2<-df[,c("SITE_NAME","YEAR","R_Stems","lnStemst_1","lnMecinust_1","lnGRASSt_1","lnO_WEEDt_1","lnBGROUNDt_1","pr_May","pr_Mayt_1")]
   
+  stemdf2$lnStemst_1 <- as.numeric(stemdf2$lnStemst_1)
+  stemdf2$lnMecinust_1 <- as.numeric(stemdf2$lnMecinust_1)
+  stemdf2$lnGRASSt_1 <- as.numeric(stemdf2$lnGRASSt_1)
+  stemdf2$lnO_WEEDt_1 <- as.numeric(stemdf2$lnO_WEEDt_1)
+  stemdf2$lnBGROUNDt_1 <- as.numeric(stemdf2$lnBGROUNDt_1)
+  stemdf2$pr_Mayt_1 <- as.numeric(stemdf2$pr_Mayt_1)
+  stemdf2$pr_May <- as.numeric(stemdf2$pr_May)
   
 #modeling time ayo ----
   library(nlme)
-  lmm1<-lme(R_Stems ~ lnStemst_1 + lnMecinust_1 + lnGRASSt_1 + lnBGROUNDt_1 
-            + pr_May + pr_May*lnGRASSt_1+ pr_May*lnMecinust_1, 
+  lmm1<-lme(R_Stems ~ lnStemst_1 + lnMecinust_1 +lnGRASSt_1 + lnO_WEEDt_1 + lnBGROUNDt_1
+            + pr_Mayt_1 + pr_May*lnMecinust_1 + pr_May*lnStemst_1, 
             method="ML", random = ~1|SITE_NAME, data = stemdf2, na.action= na.fail)
   VarCorr(lmm1)
   summary(lmm1)
   anova(lmm1)
+  
+#correlation matrix to see how it's looking ----
+  # Create a subset of the variables of interest
+  predictors <- c("lnStemst_1", "lnMecinust_1", "lnGRASSt_1", "lnBGROUNDt_1", "pr_May")
+  subset_df <- stemdf2[, predictors]
+  
+  # Calculate the correlation matrix
+  cor_matrix <- cor(subset_df)
+  
+  # Print the correlation matrix
+  print(cor_matrix)
+  
   
 #okay, I don't know when I'm having issues with this model right off the bat
   #its giving me NaNs for all the p-values and I don't remember what I did for 
