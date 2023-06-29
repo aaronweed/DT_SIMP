@@ -220,7 +220,15 @@ df<-join(dt, sites, by=c("SITE_NAME"))
   
 #okay, I don't know when I'm having issues with this model right off the bat
   #its giving me NaNs for all the p-values and I don't remember what I did for 
-  #stemdf for it to work ahahaha
+  #stemdf for it to work ahahaha -- i figured it out :)
+  
+#looking at the global model and seeing what's up 
+  library(MuMIn)
+  ms1<-dredge(lmm1)
+  head(ms1)
+  top.models.1 <-model.avg(get.models(ms1, subset = delta < 2))# Model averaging based on an information criterion, here chnadifference in AIC score <4)(models with delta.aicc < 2)
+  top.models.1
+
   
 # What Aaron did for prec: From these data, we summed precipitation (mm) that fell at a site 
  # between 1 May [Julian day (JD): 122] in the year prior (t-1) to 30 April (JD:
