@@ -50,6 +50,32 @@ library(MASS)
   clim.melt<-melt(climate, id.vars=c("SITE_NAME" , "month", "year","day" ), measure.vars=c("tmax","tmin","pr", "srad", "swe", "soil"))
   head(clim.melt) #going to go with it anyway and fix later 
   
+  #absolute values for coldest night of winter 
+  #Coldest night of winter between July year n to July n+1----
+  ### Because R is calc'd lnNt+1 -lnNt, the Tmin that matters would occur in either Nov or Dec of yeart or Jan/Feb of year t+1. 
+  ## becuase of this, I added 1 to each year in which Nov/Dec Tmin was calculated to calc abs Tmin in the same winter
+  #When does the coldest night occur? 
+  #related to the fact that the coldest night of the year is the night that is most physiologcally important to the insect
+  absTminJan<-cast(clim.melt,SITE_NAME + year+ month  ~ variable, subset= clim.melt$variable == "tmin" & clim.melt$month == "1" ,fun= min )
+  absTminFeb<-cast(clim.melt,SITE_NAME + year+ month  ~ variable, subset= clim.melt$variable == "tmin" & clim.melt$month == "2" ,fun= min )
+  absTminDec<-cast(clim.melt,SITE_NAME + year+ month  ~ variable, subset= clim.melt$variable == "tmin" & clim.melt$month == "12" ,fun= min )
+  absTminDec$year<-absTminDec$year+1
+  absTminNov<-cast(clim.melt,SITE_NAME + year+ month  ~ variable, subset= clim.melt$variable == "tmin" & clim.melt$month == "11" ,fun= min )
+  absTminNov$year<-absTminNov$year+1
+  
+  #join the temps determine the absol Tmin during same winter
+  absTmin<-join(absTminNov,absTminDec, by=c("SITE_NAME","year"))
+  absTmin<-join(absTmin,absTminJan, by=c("SITE_NAME","year"))
+  absTmin<-join(absTmin,absTminFeb, by=c("SITE_NAME","year"))
+  
+  head(absTmin)
+  absTmin<-absTmin[,c(1,2,4,6,8, 10)]
+  colnames(absTmin)<-c("SITE_NAME","YEAR","Nov","Dec","Jan", "Feb")
+  
+  ## find coldest night of winter, from Nov to Feb, in each year
+  absTmin$absTmin <-apply(absTmin[,3:6],1,min)  
+  head(absTmin)
+  
   #avg monthly mean prec for each site
   meanPrec <-cast(clim.melt, SITE_NAME + year + month ~ variable, subset = clim.melt$variable == "pr", fun=mean) 
   ####### Cummulative precip from 1 May in year t-1 to 30 April in year t----
@@ -69,6 +95,10 @@ library(MASS)
   ##drop 2022 water yr becasue of incomplete record
   summprMay<-summprMay[summprMay$YEAR < "2022",]
   
+  ##### Combine climate data for analysis
+  climate<-join(summprMay, absTmin[,c(1,2,7)], by=c("SITE_NAME", "YEAR"))
+  head(climate)
+  
   #### Some DT data manipulations ----
   data$StartDate<-as.Date(data$DATE, format= "%m/%d/%Y") #convert to StartDate
   
@@ -76,14 +106,14 @@ library(MASS)
   df<-data[,c("SITE_NAME", "longitude","latitude","YEAR","TargetWeed","OtherWeed","Forbs","Grass","BareGround", "Litter",
               "Moss","NumStems","HeightTall","Insects", "ReleaseYear")]
   # bind climate data to DT data
-  df<-join(df, summprMay, by=c("SITE_NAME", "YEAR"))
+  df<-join(df, climate, by=c("SITE_NAME", "YEAR"))
   names(df)
   
   #### create molten data frame (all values are represented for each site*time combination)
   #COME BACK TO THIS TO ADD MORE CLIMATE VARIABLES~~~~~
   df.melt<-melt(df, id.vars=c("SITE_NAME" ,"YEAR" ), measure.vars=c("longitude" , "latitude"   ,   "TargetWeed", "OtherWeed" , "Forbs", "Grass"   ,  
                                                                     "BareGround", "Litter"  ,   "Moss"    ,   "NumStems"  , "HeightTall" ,"Insects"   , "ReleaseYear" , 
-                                                                    "pr_May" ))
+                                                                    "pr_May", "absTmin" ))
   head(df.melt)
   
 ##### Add in missing annual observations for final analysis file
@@ -168,6 +198,22 @@ library(MASS)
   
   view(dt)
   
+  ## Create lagged vars for absTmin
+  dt$absTmin <- as.numeric(dt$absTmin)
+  dt<-dt%>%
+    arrange(SITE_NAME,YEAR)%>%
+    group_by(SITE_NAME)%>%
+    mutate(pabsTmin = abs(absTmin))%>%
+    mutate(lnabsTmint_1 = log(pabsTmin+1))%>%### Create lagged var  ( lag)
+    mutate(lnabsTmint_2 = lag(lnabsTmint_1))%>%
+    mutate(R_absTmin = absTmin - lnabsTmint_1)
+  
+  ## Create lagged vars for absTmin
+  dt<-dt%>%
+    arrange(SITE_NAME,YEAR)%>%
+    group_by(SITE_NAME)%>%
+    mutate(absTmint_1 = lag(absTmin))### Create lagged var  ( lag)
+  
 #### Drop sites with less than 5 years of data----
   sitesamp<-unique(data[,c("SITE_NAME","YEAR")])
   siteyr<-aggregate.data.frame(sitesamp$YEAR, by=list(sitesamp$SITE_NAME), FUN= length)
@@ -187,7 +233,7 @@ df<-join(dt, sites, by=c("SITE_NAME"))
   
   
 #clean up df a little 
-  stemdf2<-df[,c("SITE_NAME","YEAR","R_Stems","lnStemst_1","lnMecinust_1","lnGRASSt_1","lnO_WEEDt_1","lnBGROUNDt_1","pr_May","pr_Mayt_1")]
+  stemdf2<-df[,c("SITE_NAME","YEAR","R_Stems","lnStemst_1","lnMecinust_1","lnGRASSt_1","lnO_WEEDt_1","lnBGROUNDt_1","pr_May","pr_Mayt_1", "absTmint_1", "absTmin")]
   
   stemdf2$lnStemst_1 <- as.numeric(stemdf2$lnStemst_1)
   stemdf2$lnMecinust_1 <- as.numeric(stemdf2$lnMecinust_1)
@@ -196,19 +242,22 @@ df<-join(dt, sites, by=c("SITE_NAME"))
   stemdf2$lnBGROUNDt_1 <- as.numeric(stemdf2$lnBGROUNDt_1)
   stemdf2$pr_Mayt_1 <- as.numeric(stemdf2$pr_Mayt_1)
   stemdf2$pr_May <- as.numeric(stemdf2$pr_May)
+  stemdf2$absTmint_1 <- as.numeric(stemdf2$absTmint_1)
+  stemdf2$absTmin <- as.numeric(stemdf2$absTmin)
   
 #modeling time ayo ----
   library(nlme)
   lmm1<-lme(R_Stems ~ lnStemst_1 + lnMecinust_1 +lnGRASSt_1 + lnO_WEEDt_1 + lnBGROUNDt_1
-            + pr_Mayt_1 + pr_May*lnMecinust_1 + pr_May*lnStemst_1, 
-            method="ML", random = ~1|SITE_NAME, data = stemdf2, na.action= na.fail)
+            + pr_Mayt_1 + absTmint_1 + pr_May*lnMecinust_1 + pr_May*lnStemst_1 
+            + absTmin*lnMecinust_1 + absTmin*lnStemst_1, method="ML", random = ~1|SITE_NAME, 
+            data = stemdf2, na.action= na.fail)
   VarCorr(lmm1)
   summary(lmm1)
   anova(lmm1)
   
 #correlation matrix to see how it's looking ----
   # Create a subset of the variables of interest
-  predictors <- c("lnStemst_1", "lnMecinust_1", "lnGRASSt_1", "lnBGROUNDt_1", "pr_May")
+  predictors <- c("lnStemst_1", "lnMecinust_1", "lnGRASSt_1", "lnBGROUNDt_1", "pr_May", "absTmin")
   subset_df <- stemdf2[, predictors]
   
   # Calculate the correlation matrix
@@ -238,4 +287,28 @@ df<-join(dt, sites, by=c("SITE_NAME"))
  # affected by precipitation that fell between
  # monitoring dates.
   
+#better model ayo ----
+  library(nlme) 
+  lmm2<-lme(R_Stems ~ lnStemst_1 + lnMecinust_1  + pr_Mayt_1 + absTmint_1 + pr_May*lnStemst_1, 
+            method="ML", random = ~1|SITE_NAME, data = stemdf2, na.action= na.fail)
+  VarCorr(lmm2)
+  summary(lmm2)
+  anova(lmm2)
+  
+#I always have issues with graphing the models - I'll need some help pls :)
+  library(effects)
+  # Create the effects plot for precipitation
+  effects_prec <- effect("pr_Mayt_1", lmm2)
+  # Plot the effects
+  plot(effects_prec, main = "Effects Plot for Precipitation")
+  
+#effects plot for Mecinus 
+  effects_mecinus <- effect("lnMecinust_1", lmm2)
+  # Plot the effects
+  plot(effects_mecinus, main = "Effects Plot for Mecinus")
+  
+#effects plot for temp 
+  effects_Temp <- effect("absTmint_1", lmm2)
+  # Plot the effects
+  plot(effects_Temp, main = "Effects Plot for Temperature")
   
