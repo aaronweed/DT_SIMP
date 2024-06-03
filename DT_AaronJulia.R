@@ -217,55 +217,63 @@ library(dplyr)
 dt <- dt %>%
   arrange(SITE_NAME, YEAR) %>%
   group_by(SITE_NAME) %>%
-  mutate(lnStems = log(Avg_NU_STEM + 1),         # Log transform
-         lnStemst_1 = dplyr::lag(lnStems),   # Create lagged variable (lag 1)
-         lnStemst_2 = dplyr::lag(lnStemst_1),# Create lagged variable (lag 2)
-         R_Stems = lnStems - lnStemst_1)        # Calculate difference
-
+  mutate(lnStems = log(Avg_NU_STEM + 1),    
+         lnStemst_1 = lag(lnStems),   
+         R_Stems = lnStems - lnStemst_1
+  )%>%
+  ungroup()
 
 ## Create lagged vars for Mecinus
 names(dt)
 dt<-dt%>%
   arrange(SITE_NAME,YEAR)%>%
   group_by(SITE_NAME)%>%
-  mutate(lnMecinus = log(Avg_INSECTS+1))%>%### log trans
-  mutate(lnMecinust_1 = dplyr::lag(lnMecinus))%>%### Create lagged var  ( lag)
-  mutate(lnMecinust_2 = dplyr::lag(lnMecinust_1))%>%### Create lagged var  ( lag)
-  mutate(R_Mecinus = lnMecinus-lnMecinust_1)
+  mutate(lnMecinus = log(Avg_INSECTS+1), 
+         lnMecinust_1 = lag(lnMecinus), 
+         R_Mecinus = lnMecinus-lnMecinust_1
+  )%>%
+  ungroup()
 
 ## Create lagged vars and R for other weeds
 
 dt<-dt%>%
   arrange(SITE_NAME,YEAR)%>%
   group_by(SITE_NAME)%>%
-  mutate(lnO_WEED = log(Avg_O_WEED+1))%>%### log trans
-  mutate(lnO_WEEDt_1 = lag(lnO_WEED))%>%### Create lagged var  ( lag)
-  mutate(lnO_WEEDt_2 = lag(lnO_WEEDt_1))### Create lagged var  ( lag)
+  mutate(lnO_WEED = log(Avg_O_WEED+1),
+         lnO_WEEDt_1 = lag(lnO_WEED)
+  )%>%
+  ungroup()
 
 ## Create lagged vars for GRASS
 
 dt<-dt%>%
   arrange(SITE_NAME,YEAR)%>%
   group_by(SITE_NAME)%>%
-  mutate(lnGRASS = log(Avg_GRASS+1))%>%### log trans
-  mutate(lnGRASSt_1 = lag(lnGRASS))%>%### Create lagged var  ( lag)
-  mutate(lnGRASSt_2 = lag(lnGRASSt_1))### Create lagged var  ( lag)
+  mutate(lnGRASS = log(Avg_GRASS+1), 
+         lnGRASSt_1 = lag(lnGRASS)
+         )%>%
+  ungroup()
+
 
 ## Create lagged vars for B_GROUND
 dt<-dt%>%
   arrange(SITE_NAME,YEAR)%>%
   group_by(SITE_NAME)%>%
-  mutate(lnBGROUND = log(Avg_B_GROUND+1))%>%### log trans
-  mutate(lnBGROUNDt_1 = lag(lnBGROUND))%>%### Create lagged var  ( lag)
-  mutate(lnBGROUNDt_2 = lag(lnBGROUNDt_1))### Create lagged var  ( lag)
+  mutate(lnBGROUND = log(Avg_B_GROUND+1), 
+         lnBGROUNDt_1 = lag(lnBGROUND)
+         )%>%
+  ungroup()
+
 
 ## Create lagged vars for FORBS
 dt<-dt%>%
   arrange(SITE_NAME,YEAR)%>%
   group_by(SITE_NAME)%>%
-  mutate(lnFORB = log(Avg_FORB+1))%>%### log trans
-  mutate(lnFORBt_1 = lag(lnFORB))%>%### Create lagged var  ( lag)
-  mutate(lnFORBt_2 = lag(lnFORBt_1))### Create lagged var  ( lag)		
+  mutate(lnFORB = log(Avg_FORB+1), 
+         lnFORBt_1 = lag(lnFORB)
+         )%>%
+  ungroup()
+  	
 
 ## Create standardized vals and lag for pptMay
 dt<-dt%>%
@@ -289,7 +297,7 @@ colnames(keep)<-c("SITE_NAME", "yr_mon")
 site<-c(keep$SITE_NAME)
 dt<-dt[dt$SITE_NAME %in% site,]
 
-write.csv(dt, "dt.csv", row.names = FALSE)
+#write.csv(dt, "dt.csv", row.names = FALSE)
 #### Append site metdata to dt
 df<-join(dt, sites, by ="SITE_NAME")
 head(df)
