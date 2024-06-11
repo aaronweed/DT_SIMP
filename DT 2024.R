@@ -25,7 +25,9 @@ data <- data %>%
     GRASS = rowMeans(select_if(across(starts_with("GRASS")), is.numeric), na.rm = TRUE),
     INSECTS = rowMeans(select_if(across(starts_with("INSECTS")), is.numeric), na.rm = TRUE)
   )
-
+length(data)
+names(data)
+head(data)
 
 #join climate and sites together 
 library(plyr)
@@ -40,26 +42,34 @@ clim.melt <- climate %>%
                values_to = "value") %>%
   dplyr::select(SITE_NAME, month, day, year, variable, value)
 
+print(clim.melt$variable[1:20])
+
 ##filter data 
 absTminJan <- clim.melt %>%
   filter(variable == "tmin", month == 1) %>%
   group_by(SITE_NAME, year, month) %>%
   dplyr::summarise(pr_month=min(value))
+print(mean(absTminJan$month))
 
 absTminFeb <- clim.melt %>%
   filter(variable == "tmin", month == 2) %>%
   group_by(SITE_NAME, year, month) %>%
   dplyr::summarise(pr_month=min(value))
+print(mean(absTminFeb$month))
 
 absTminDec <- clim.melt %>%
   filter(variable == "tmin", month == 12) %>%
   group_by(SITE_NAME, year, month) %>%
   dplyr::summarise(pr_month=min(value))
+print(mean(absTminDec$month))
+
 
 absTminNov <- clim.melt %>%
   filter(variable == "tmin", month == 11) %>%
   group_by(SITE_NAME, year, month) %>%
   dplyr::summarise(pr_month=min(value))
+print(mean(absTminNov$month))
+
 
 ##create absTmin dataframe 
 absTmin <- join(absTminNov, absTminDec, by = c("SITE_NAME", "year"))
@@ -68,12 +78,15 @@ absTmin <- left_join(absTmin, absTminFeb, by = c("SITE_NAME", "year"))
 absTmin<-absTmin[,c(1,2,4,6,8,10)]
 colnames(absTmin)<-c("SITE_NAME","YEAR","Nov","Dec","Jan", "Feb")
 absTmin$absTmin <-apply(absTmin[,3:6],1,min) 
+head(absTmin)
 
 #Now work on precipitation 
 summprMon <- clim.melt %>%
   filter(variable == "pr") %>%
   group_by(SITE_NAME, year, month) %>%
   dplyr::summarise(pr_month=sum(value)) #convert cm to mm
+print(clim.melt$variable[1:20])
+
 
 library(dplyr)
 
@@ -81,11 +94,14 @@ library(dplyr)
 # The water year is the year that could affect R (between dates when pops were measured)
 summprMon <- summprMon %>%
   mutate(wateryr = ifelse(month > 4, year + 1, year))
+print(summprMon$month[1:100])
+print(summprMon)
 
 # Calculate the sum of precipitation for May by SITE_NAME and wateryr
 summprMay <- summprMon %>%
   group_by(SITE_NAME, wateryr) %>%
   dplyr::summarise(pr_May = sum(pr_month))
+print(summprMon)
 
 # Rename columns
 colnames(summprMay) <- c("SITE_NAME", "YEAR", "pr_May")
@@ -94,6 +110,7 @@ colnames(summprMay) <- c("SITE_NAME", "YEAR", "pr_May")
 climate<-join(summprMay, absTmin, by=c("SITE_NAME", "YEAR"))
 climate<-climate[,c(1,2,3,8)]
 climate <- na.omit(climate)
+print(climate)
 
 ##
 #### subset df to get the averages
@@ -123,6 +140,8 @@ head(df.long)
 
 # check to make sure all site by year combos are here
 length(levels(df.long$SITE_NAME))*length(levels(df.long$YEAR)) ## number of rows (site X year combos)
+
+print(df.long)
 
 #### Create lags and calculate interannual change in stem density (NU_STEM) and Mecinus----
 dt<-tibble::as_tibble(df.long)
@@ -214,6 +233,7 @@ colnames(keep)<-c("SITE_NAME", "yr_mon")
 site<-c(keep$SITE_NAME)
 dt<-dt[dt$SITE_NAME %in% site,]
 
+view(dt)
 ##
 #### Append site metdata to dt
 df<-join(dt, sites, by ="SITE_NAME")
@@ -222,7 +242,7 @@ head(df)
 
 ##DD plot for stems
 library(nlme)
-topmod<-lme(R_Stems ~ lnStemst_1+ lnMecinust_1+pr_May, method="REML", na.action=na.exclude,
+topmod<-lme(R_Stems ~ lnStemst_1+ lnMecinust_1+ppt_Mayt_1, method="REML", na.action=na.exclude,
             random = ~1 |SITE_NAME, data = df)
 
 df$fitted<-fitted(topmod)
@@ -270,7 +290,7 @@ r.squaredGLMM(rsq_mecinus)
 plot(df$pr_May, df$DDresids)
 
 library(ggplot2)
-ggplot(data = df, aes(x = pr_May, y = DDresids)) +
+ggplot(data = df, aes(x = ppt_Mayt_1, y = DDresids)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE, col="red")+
   labs(
@@ -280,5 +300,20 @@ ggplot(data = df, aes(x = pr_May, y = DDresids)) +
   theme(axis.text = element_text(size = 12),
         axis.title = element_text(size = 15)) 
 
-rsq_pr<-lme(DDresids ~ pr_May, method="REML", na.action=na.exclude, random = ~1|SITE_NAME, data=df)
+rsq_pr<-lme(DDresids ~ ppt_Mayt_1, method="REML", na.action=na.exclude, random = ~1|SITE_NAME, data=df)
 r.squaredGLMM(rsq_pr)
+
+##model selection 
+#need to read up and see what the literature suggests -> dredge isn't the way 
+library(nlme)
+df<-na.omit(df)
+fullMod<- lme(R_Stems ~ lnStemst_1+ lnMecinust_1+ppt_Mayt_1, method="REML", na.action=na.fail,random = ~1 |SITE_NAME, data = df)
+anova(fullMod)
+summary(fullMod)
+
+model_selection <- dredge(fullMod)
+summary(model_selection)
+print(model_selection)
+avg.models.full <-model.avg(get.models(model_selection, subset = delta < 7))# Model averaging based on an information criterion, here chnadifference in AIC score <4)(models with delta.aicc < 2)
+avg.models.full
+
