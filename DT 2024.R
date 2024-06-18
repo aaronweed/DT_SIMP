@@ -303,6 +303,8 @@ ggplot(data = df, aes(x = ppt_Mayt_1, y = DDresids)) +
 rsq_pr<-lme(DDresids ~ ppt_Mayt_1, method="REML", na.action=na.exclude, random = ~1|SITE_NAME, data=df)
 r.squaredGLMM(rsq_pr)
 
+
+
 ##model selection 
 #need to read up and see what the literature suggests -> dredge isn't the way 
 library(nlme)
