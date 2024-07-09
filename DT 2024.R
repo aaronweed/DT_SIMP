@@ -208,6 +208,15 @@ dt<-dt%>%
   )%>%
   ungroup()
 
+##target 
+dt<-dt%>%
+  arrange(SITE_NAME,YEAR)%>%
+  group_by(SITE_NAME)%>%
+  mutate(lnT_WEED = log(T_WEED+ 1),
+         lnT_WEEDt_1 = lag(lnT_WEED)
+  )%>%
+  ungroup()
+
 ##precipitation 
 dt<-dt%>%
   arrange(SITE_NAME,YEAR)%>%
@@ -303,13 +312,126 @@ ggplot(data = df, aes(x = ppt_Mayt_1, y = DDresids)) +
 rsq_pr<-lme(DDresids ~ ppt_Mayt_1, method="REML", na.action=na.exclude, random = ~1|SITE_NAME, data=df)
 r.squaredGLMM(rsq_pr)
 
+#I wonder what's going on here. There may be some competition between grasses/otherweed/forbs with the target. Need to model vegetation to really see what's happening. 
+names(df)
+df.na<-na.omit(df)
+library(nlme)
+vegmod<-lme(R_Stems ~ lnStemst_1 + lnO_WEEDt_1 + lnGRASSt_1 + lnFORBt_1 + lnBGROUNDt_1 , method="REML", na.action=na.fail,
+            random = ~1 |SITE_NAME, data = df.na)
+anova(vegmod)
+summary(vegmod)
 
+model_sel_veg <- dredge(vegmod)
+summary(model_sel_veg)
+print(model_sel_veg)
+avg.models.veg <-model.avg(get.models(model_sel_veg, subset = delta < 7))# Model averaging based on an information criterion, here chnadifference in AIC score <4)(models with delta.aicc < 2)
+avg.models.veg$formula 
+
+# bestveg<-lme(R_Stems ~ lnStemst_1 + lnO_WEEDt_1 + lnGRASSt_1 + lnFORBt_1 + lnBGROUNDt_1 , method="REML", na.action=na.exclude,
+#              random = ~1 |SITE_NAME, data = df)
+# summary(bestveg)
+# anova(bestveg)
+
+df.na$fitveg<-fitted(vegmod)
+
+DDvegmod<-lme(fitveg~lnStemst_1, method="REML", na.action=na.exclude, random = ~1 |SITE_NAME, data = df.na)
+
+df.na$DDresveg<-resid(DDvegmod)
+
+plot(df.na$lnGRASSt_1, df.na$DDresveg)
+
+#grass
+library(ggplot2)
+ggplot(data = df.na, aes(x = lnGRASSt_1, y = DDresveg)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, col="red")+
+  labs(
+    x = "Percent cover grass/quadrat/site/year",
+    y = "Interannual change in stem density (log)") +
+  theme_minimal()+
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 15)) 
+rsq_gr<-lme(DDresveg ~ lnGRASS, method="REML", na.action=na.exclude, random = ~1|SITE_NAME, data=df)
+r.squaredGLMM(rsq_gr)
+
+#forbs
+library(ggplot2)
+ggplot(data = df.na, aes(x = lnFORBt_1, y = DDresveg)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, col="red")+
+  labs(
+    x = "Percent cover forbs/quadrat/site/year",
+    y = "Interannual change in stem density (log)") +
+  theme_minimal()+
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 15)) 
+rsq_gr<-lme(DDresveg ~ lnGRASSt_1, method="REML", na.action=na.exclude, random = ~1|SITE_NAME, data=df)
+r.squaredGLMM(rsq_gr)
+#compare across vegetation covers what goes up and what goes down with prec to see if there's any competition
+
+# Forbs
+ggplot(data = df, aes(x = ppt_Mayt_1, y = lnFORB)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, col="blue") +
+  labs(
+    x = "Annual precipitation/site/year",
+    y = "Log Percent Cover Forbs") +
+  theme_minimal() +
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 15))
+
+# Grass
+ggplot(data = df, aes(x = ppt_Mayt_1, y = lnGRASS)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, col="green") +
+  labs(
+    x = "Annual precipitation/site/year",
+    y = "Log Percent Cover Grass") +
+  theme_minimal() +
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 15))
+
+# Other Weeds
+ggplot(data = df, aes(x = ppt_Mayt_1, y = lnO_WEED)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, col="orange") +
+  labs(
+    x = "Annual precipitation/site/year",
+    y = "Log Percent Cover Other Weeds") +
+  theme_minimal() +
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 15))
+
+# Tall Weeds
+ggplot(data = df, aes(x = ppt_Mayt_1, y = lnT_WEED)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, col="purple") +
+  labs(
+    x = "Annual precipitation/site/year",
+    y = "Log Percent Cover DT ") +
+  theme_minimal() +
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 15))
+
+# Tall Weeds
+ggplot(data = df, aes(x = ppt_Mayt_1, y = lnBGROUND)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, col="purple") +
+  labs(
+    x = "Annual precipitation/site/year",
+    y = "Log Percent Cover bare ground ") +
+  theme_minimal() +
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 15))
+
+#other weeds percent cover and target weed cover and bareground all decrease with increased preciptitation while % cover of grasses and native forbs increase with increased prec
+#there's something there. 
 
 ##model selection 
 #need to read up and see what the literature suggests -> dredge isn't the way 
 library(nlme)
-df<-na.omit(df)
-fullMod<- lme(R_Stems ~ lnStemst_1+ lnMecinust_1+ppt_Mayt_1, method="REML", na.action=na.fail,random = ~1 |SITE_NAME, data = df)
+#df<-na.omit(df)
+fullMod<- lme(R_Stems ~ lnStemst_1+ lnMecinust_1+lnMecinus+absTmin+pr_May+ppt_Mayt_1, method="REML", na.action=na.exclude,random = ~1 |SITE_NAME, data = df)
 anova(fullMod)
 summary(fullMod)
 
@@ -319,3 +441,28 @@ print(model_selection)
 avg.models.full <-model.avg(get.models(model_selection, subset = delta < 7))# Model averaging based on an information criterion, here chnadifference in AIC score <4)(models with delta.aicc < 2)
 avg.models.full
 
+
+
+#seeing the distribution of sites over the years 
+
+all_years <- expand.grid(SITE_NAME = unique(data$SITE_NAME), YEAR = 2007:2023)
+
+# Full join with the data to include all site-year combinations
+site_years <- full_join(all_years, data, by = c("SITE_NAME", "YEAR")) %>%
+  dplyr::mutate(monitored = ifelse(!is.na(B_GROUND), 1, 0))
+
+ggplot(site_years, aes(x = YEAR, y = SITE_NAME, fill = as.factor(monitored))) +
+  geom_tile(color = "white") +
+  scale_fill_manual(values = c("1" = "blue", "0" = "gray")) +
+  scale_x_continuous(breaks = seq(2007, 2023, 1), limits = c(2007, 2023)) +
+  labs(title = "Site Monitoring Status Over the Years",
+       x = "Year",
+       y = "Site",
+       fill = "Monitored") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+
+
+
+#vegetation modeling next/maybe just use dredge for rn and talk to aaron about it later je ne sais pas. 
